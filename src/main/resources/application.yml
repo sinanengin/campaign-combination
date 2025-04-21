@@ -1,0 +1,27 @@
+spring:
+  datasource:
+    url: "jdbc:oracle:thin:@(DESCRIPTION=(LOAD_BALANCE=yes)(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(HOST=anafiel-vip.tm.turkcell.tgc)(PORT=1521))(ADDRESS=(PROTOCOL=TCP)(HOST=azbuga-vip.tm.turkcell.tgc)(PORT=1521)))(CONNECT_DATA=(SERVER=dedicated)(SERVICE_NAME=BSCSSTABLE.TURKCELL)))"
+    username: "UCCS_TESTER"
+    password: "S_UCCS_TESTER"
+    driver-class-name: oracle.jdbc.OracleDriver
+
+  jpa:
+    show-sql: true
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  main:
+    allow-bean-definition-overriding: true
+
+server:
+  port: 8080
+
+logging:
+  level:
+    root: INFO
+    org.springframework.jdbc.core: WARN
+    org.springframework.data.redis: WARN
+
