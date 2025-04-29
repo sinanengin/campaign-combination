@@ -34,6 +34,11 @@ public class CampaignCombinationRepositoryImpl implements CampaignCombinationRep
     }
 
     @Override
+    public JdbcTemplate getJdbcTemplate() {
+        return this.jdbcTemplate;
+    }
+
+    @Override
     public List<Map<String, Object>> findMatchingOffers() {
         long startTime = System.currentTimeMillis(); // ⭐ Başlangıç zamanı
 
