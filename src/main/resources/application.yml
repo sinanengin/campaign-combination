@@ -4,9 +4,21 @@ spring:
     username: "UCCS_TESTER"
     password: "S_UCCS_TESTER"
     driver-class-name: oracle.jdbc.OracleDriver
+  jackson:
+    default-property-inclusion: non_null
+    deserialization:
+      fail-on-unknown-properties: false
+      accept-single-value-as-array: true
+    serialization:
+      fail-on-empty-beans: false
+      write-dates-as-timestamps: false
+    mapper:
+      accept-case-insensitive-properties: true
 
   jpa:
     show-sql: true
+
+
 
   data:
     redis:
@@ -24,4 +36,3 @@ logging:
     root: INFO
     org.springframework.jdbc.core: WARN
     org.springframework.data.redis: WARN
-

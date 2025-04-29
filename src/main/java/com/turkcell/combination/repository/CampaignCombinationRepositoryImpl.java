@@ -1,17 +1,20 @@
 package com.turkcell.combination.repository;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import jakarta.annotation.PostConstruct;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.IntStream;
 
 @Repository
 public class CampaignCombinationRepositoryImpl implements CampaignCombinationRepository {
+
+    private static final Logger logger = LoggerFactory.getLogger(CampaignCombinationRepositoryImpl.class);
 
     private static final String REDIS_KEY_PREFIX = "campaign_combination_batch:";
     private static final String REDIS_INDEX_KEY = "campaign_combination_index";
@@ -24,8 +27,16 @@ public class CampaignCombinationRepositoryImpl implements CampaignCombinationRep
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
+    @PostConstruct
+    public void initCacheOnStartup() {
+        logger.info("🛠 Başlangıçta veriler Redis'e kaydediliyor...");
+        findMatchingOffers();
+    }
+
     @Override
     public List<Map<String, Object>> findMatchingOffers() {
+        long startTime = System.currentTimeMillis(); // ⭐ Başlangıç zamanı
+
         // 1. Redis'te veri var mı?
         List<Object> cachedKeys = redisTemplate.opsForList().range(REDIS_INDEX_KEY, 0, -1);
         if (cachedKeys != null && !cachedKeys.isEmpty()) {
@@ -37,6 +48,9 @@ public class CampaignCombinationRepositoryImpl implements CampaignCombinationRep
                     all.addAll(part);
                 }
             }
+
+            long endTime = System.currentTimeMillis();
+            System.out.println("✅ Redis'ten veri okuma tamamlandı (" + (endTime - startTime) / 1000.0 + " saniye)");
             return all;
         }
 
@@ -45,6 +59,7 @@ public class CampaignCombinationRepositoryImpl implements CampaignCombinationRep
         List<String> batchKeys = Collections.synchronizedList(new ArrayList<>());
         List<Map<String, Object>> fullList = Collections.synchronizedList(new ArrayList<>());
         int offset = 0;
+        int totalInserted = 0;
 
         while (true) {
             String sql = "SELECT * FROM CPCM.COC_FULL_LIST OFFSET " + offset + " ROWS FETCH NEXT " + BATCH_SIZE + " ROWS ONLY";
@@ -59,15 +74,19 @@ public class CampaignCombinationRepositoryImpl implements CampaignCombinationRep
 
             redisTemplate.opsForValue().set(redisKey, batch, CACHE_TTL_MINUTES, TimeUnit.MINUTES);
             offset += BATCH_SIZE;
+            totalInserted += batch.size();
 
             System.out.println("✅ Batch #" + batchIndex + " Redis'e yazıldı (" + batch.size() + " kayıt)");
         }
 
-        // 3. Index key'i yaz
         redisTemplate.opsForList().rightPushAll(REDIS_INDEX_KEY, batchKeys.toArray());
         redisTemplate.expire(REDIS_INDEX_KEY, CACHE_TTL_MINUTES, TimeUnit.MINUTES);
 
-        System.out.println("✔️ Tüm veri parçalı olarak Redis'e yazıldı. Toplam kayıt: " + fullList.size());
+        long endTime = System.currentTimeMillis(); // ⭐ Bitiş zamanı
+        System.out.println("✔️ Tüm veri Redis'e parçalı olarak yazıldı. Toplam kayıt: " + totalInserted);
+        System.out.println("⏱️ Cacheleme işlemi toplam " + (endTime - startTime) / 1000.0 + " saniye sürdü.");
+
         return fullList;
     }
 }
+
