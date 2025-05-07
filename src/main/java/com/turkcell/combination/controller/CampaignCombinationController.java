@@ -13,7 +13,7 @@ public class CampaignCombinationController {
     @Autowired
     private CampaignCombinationService campaignCombinationService;
 
-    @PostMapping
+    @PostMapping(consumes = "application/json")
     public CampaignCombinationResponse getValidCombinations(@RequestBody CampaignCombinationRequest request) {
         return campaignCombinationService.getValidCombinations(request);
     }

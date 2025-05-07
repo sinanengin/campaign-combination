@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 public interface CampaignCombinationRepository {
-    List<Map<String, Object>> findMatchingOffers();
+    void populateFullCache();
+    List<Map<String, Object>> findMatchingOffers(List<String> requestedKeys);
     JdbcTemplate getJdbcTemplate();
 }

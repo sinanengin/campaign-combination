@@ -1,53 +1,58 @@
 package com.turkcell.combination.service;
 
-import com.turkcell.combination.model.CombinationRow;
 import com.turkcell.combination.repository.CampaignCombinationRepository;
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 
 @Service
 public class CampaignCombinationCacheService {
+
+    private static final Logger logger = LoggerFactory.getLogger(CampaignCombinationCacheService.class);
 
     @Autowired
     private CampaignCombinationRepository repository;
 
     @PostConstruct
-    public void initialLoad() {
-        System.out.println("🚀 [CacheService] Initial cache loading started...");
+    public void initializeCache() {
         Instant start = Instant.now();
+        logger.info("🚀 [CacheService] Initial cache load started...");
 
-        repository.findMatchingOffers(); // cache'e yazıyor
-
-        Instant end = Instant.now();
-        System.out.println("✅ [CacheService] Initial cache loaded in " + Duration.between(start, end).toSeconds() + " seconds.");
-    }
-
-    @Scheduled(fixedRate = 120000) // 2 dakikada bir
-    public void refreshIfNeeded() {
-        System.out.println("🔄 [CacheService] Refresh check started...");
-
-        boolean hasUpdates = checkForUpdates();
-        if (hasUpdates) {
-            System.out.println("📥 [CacheService] Updates detected! Reloading cache...");
-            Instant start = Instant.now();
-
-            repository.findMatchingOffers(); // Güncel veriyi tekrar cache'e al
-
-            Instant end = Instant.now();
-            System.out.println("✅ [CacheService] Cache refreshed in " + Duration.between(start, end).toSeconds() + " seconds.");
-        } else {
-            System.out.println("✅ [CacheService] No updates found. Cache is up-to-date.");
+        try {
+            repository.populateFullCache();
+            logger.info("✅ [CacheService] Initial cache loaded in {} seconds.",
+                    Duration.between(start, Instant.now()).toSeconds());
+        } catch (Exception e) {
+            logger.error("❌ [CacheService] Initial cache loading failed.", e);
         }
     }
 
-    private boolean checkForUpdates() {
-        // 🔍 Oracle'a SELECT
+    @Scheduled(fixedRate = 120_000) // every 2 minutes
+    public void checkForUpdatesAndRefresh() {
+        Instant start = Instant.now();
+        logger.info("🔄 [CacheService] Checking for updates...");
+
+        try {
+            if (hasCombinationUpdates()) {
+                logger.info("📥 [CacheService] Updates found. Refreshing cache...");
+                repository.populateFullCache();
+                logger.info("✅ [CacheService] Cache refreshed in {} seconds.",
+                        Duration.between(start, Instant.now()).toSeconds());
+            } else {
+                logger.info("✅ [CacheService] No updates found. Cache is up-to-date.");
+            }
+        } catch (Exception e) {
+            logger.error("❌ [CacheService] Cache refresh failed.", e);
+        }
+    }
+
+    private boolean hasCombinationUpdates() {
         String sql = """
             SELECT COUNT(*) 
             FROM CPCM.VERSION V
@@ -62,8 +67,12 @@ public class CampaignCombinationCacheService {
               AND V.START_VALIDITY_DATE < SYSDATE
         """;
 
-        Integer count = repository.getJdbcTemplate().queryForObject(sql, Integer.class);
-
-        return count != null && count > 0;
+        try {
+            Integer count = repository.getJdbcTemplate().queryForObject(sql, Integer.class);
+            return count != null && count > 0;
+        } catch (Exception e) {
+            logger.error("❌ [CacheService] Update check failed.", e);
+            return false;
+        }
     }
 }
